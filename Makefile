@@ -1,136 +1,50 @@
-#####################################################################
-#
-# Makefile for building and installing man_proj
-#
-#               ----- ----- NeXT Confidential ----- -----
-#
-# History (YY-MM-DD-wd):
-#
-# 92-12-22-tu: Revised by Kathy Walrath, NeXT Computer, Inc.
-# 97-05-29-we: Indexing support removed by Matt Rollefson, Apple
-#              Computer, Inc.
-#
-######################################################################
+##
+# Makefile for man
+##
 
-######################################################################
-# Macros/variables
-######################################################################
+# Project info
+Project         = man
+GnuAfterInstall = strip-man link-manpath install-plist fix-perms install-ff
 
-NAME = man
-SUBDIRS = usr/man
-MANDIR = ${DSTROOT}/usr/share/man
-#INDEXFILE= ${MANDIR}/.index.store
-#INDEXFLAGS=-fsvg -LEnglish
+install:: shadow_source
 
-# DSTROOT must be provided by invoker
-# 	E.g., for a test:  make installsrc SRCROOT=/tmp/mansrc
-# SRCROOT must be provided by invoker
-# 	E.g., for a test:  make install DSTROOT=/tmp/mandst
-OBJROOT = .  # overridden by Release Control when project is submitted
-SYMROOT = .  # overridden by Release Control when project is submitted
+include $(MAKEFILEPATH)/CoreOS/ReleaseControl/GNUSource.make
 
-#####
-# The following parameters have no meaning for doc_proj, as cc isn't
-# used, and there are no architecture dependencies.
-#
-# RC_CFLAGS
-# RC_ARCHS
-# RC_m68k
-# RC_m88k   # R.I.P.
-# RC_m98k   # aka the PowerPC architecture
-# RC_i386
+# Not quite like other GNU projects...
+Configure_Flags = -d -prefix="$(Install_Prefix)" \
+                  -confdir="$(ETCDIR)" \
+                  -compatibility_mode_for_colored_groff
+Extra_Make_Flags = CFLAGS="$(RC_CFLAGS)" LDFLAGS="$(RC_CFLAGS)" LIBS=-lxcselect
+Install_Flags   = DESTDIR="$(DSTROOT)"
+Install_Target  = install
 
-#####
-# The following parameters have no meaning for doc_proj. ???
-#
-# RC_KANJI    # ??? find out if this applies
-# JAPANESE    # ??? find out if this applies
-# SUBLIBROOTS
+# Extract the source.
+install_source::
 
+strip-man:
+	$(STRIP) -x $(DSTROOT)/usr/bin/man
 
-######################################################################
-# Targets for building man_proj
-######################################################################
+link-manpath:
+	$(LN) -s man $(DSTROOT)/usr/bin/manpath
+	$(LN) -s man.1 $(DSTROOT)/usr/share/man/man1/manpath.1
 
-all default ${NAME}:
-	 for i in ${SUBDIRS}; \
-	 do \
-		echo ================= make $@ for $$i =================; \
-		(cd $$i; ${MAKE} $@); \
-	 done
+fix-perms:
+	@for prog in apropos man whatis; do \
+		$(CHMOD) $(Install_Program_Mode) $(DSTROOT)/usr/bin/$${prog}; \
+		$(CHMOD) $(Install_File_Mode) $(DSTROOT)/usr/share/man/man1/$${prog}.1; \
+	done
 
-#####
-# This should perhaps remove some more dot files.  Index files should probably 
-# be deleted.
-#
-clean::
-	find . \( -name '*~' -o -name '#*' -o -name '.places' -o -name '.list' -o -name '.DS_Store' -o -name 'Icon?' \) -exec rm {} \;
+OSV     = $(DSTROOT)/usr/local/OpenSourceVersions
+OSL     = $(DSTROOT)/usr/local/OpenSourceLicenses
 
-#####
-# The "-CWD=`pwd`..." line is a standard invocation used to convert DSTROOT 
-# into a full path name.  (I don't know why, but I don't dare to take it out.)  
-# You end up not changing the current working directory.
-#	-CWD=`pwd`; cd ${DSTROOT}; DSTROOT=`pwd`; cd $$CWD; \
-#
-install:: ${DSTROOT}
-	-CWD=`pwd`; cd ${DSTROOT}; DSTROOT=`pwd`; cd $$CWD; \
-	 for i in ${SUBDIRS}; \
-	 do \
-		echo ================= make $@ for $$i =================; \
-		(cd $$i; ${MAKE} DSTROOT=$$DSTROOT $@); \
-	 done
-# Create the whatis database.
-#	/usr/libexec/makewhatis ${MANDIR}
+install-plist:
+	$(MKDIR) $(OSV)
+	$(INSTALL_FILE) $(SRCROOT)/$(Project).plist $(OSV)/$(Project).plist
+	$(MKDIR) $(OSL)
+	$(INSTALL_FILE) $(Sources)/COPYING $(OSL)/$(Project).txt
 
-# Copy the special index files.  These change from release to release....
-# 5/97 MR Special index files for Librarian support commented out
-#	cp icon.tiff ${MANDIR}/.dir.tiff
-#	cp .index.iname ${MANDIR}/.index.iname
-#	cp .index.itype ${MANDIR}/.index.itype
-#	cp .displayCommand ${MANDIR}/.displayCommand
-#	cp .roffArgs ${MANDIR}/.roffArgs
+FF      = $(DSTROOT)/System/Library/FeatureFlags/Domain/
 
-# Create the index when installing.
-# 5/97 MR Commented out
-#	-/bin/rm -rf ${INDEXFILE}
-#	(cd ${MANDIR} ; ixbuild  ${INDEXFLAGS}) || exit 1
-
-# Change permissions.
-# 5/97 MR Commented out files that are no longer copied
-# 10/97 MR have to reenable the whatis file when it's generated again
-#	chmod 644 ${INDEXFILE}
-#	chmod 644 ${MANDIR}/whatis
-#	chmod 444 ${MANDIR}/.dir.tiff
-#	chmod 444 ${MANDIR}/.index.iname
-#	chmod 444 ${MANDIR}/.index.itype
-#	chmod 444 ${MANDIR}/.displayCommand
-#	chmod 444 ${MANDIR}/.roffArgs
-	chown -R root.wheel ${MANDIR}
-
-# Check for and remove any core files.
-	# find /${MANDIR} -name 'core' -exec rm -rf {} \;
-
-# Create a link that points to /usr/share/man
-# 10/97 MR
-# For developer documentation directory *only*
-# 4/00 MR
-	
-	#Allowing bsdmanpages to create the symlink to /usr/share/man
-	#mkdir -p ${DSTROOT}/Developer/Documentation
-	#ln -s /usr/share/man ${DSTROOT}/Developer/Documentation/ManPages
-
-#####
-# Copy this directory to SRCROOT.
-#
-installsrc:: ${SRCROOT}
-	gnutar cf - . | (cd ${SRCROOT}; tar xvfp -)
-
-#####
-# Since man_proj has no headers, the "installhdrs" target does nothing.
-#
-installhdrs::	# Do nothing.
-
-#####
-# Create the SRCROOT and DSTROOT directories.
-#
-${SRCROOT} ${DSTROOT}:; mkdir -p -m 755 $@
+install-ff:
+	$(MKDIR) $(FF)
+	$(INSTALL_FILE) $(SRCROOT)/ff-$(Project).plist $(FF)/$(Project).plist
